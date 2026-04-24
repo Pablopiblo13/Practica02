@@ -1,0 +1,43 @@
+@model List<PortalAcademico.Models.Curso>
+
+<h2>Catálogo de Cursos</h2>
+
+@if (TempData["Mensaje"] != null)
+{
+    <div class="alert alert-info">
+        @TempData["Mensaje"]
+    </div>
+}
+
+<form method="get">
+    <input type="text" name="nombre" placeholder="Nombre" />
+    <input type="number" name="minCreditos" placeholder="Min Créditos" />
+    <input type="number" name="maxCreditos" placeholder="Max Créditos" />
+    <button type="submit">Filtrar</button>
+</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Créditos</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var curso in Model)
+        {
+            <tr>
+                <td>@curso.Codigo</td>
+                <td>@curso.Nombre</td>
+                <td>@curso.Creditos</td>
+                <td>
+                    <a class="btn btn-primary" href="/Cursos/Detalle/@curso.Id">Detalle</a>
+                    <a class="btn btn-success" href="/Cursos/Inscribirse/@curso.Id">Inscribirse</a>
+                    <a class="btn btn-secondary" href="/Cursos/MisCursos">Mis Cursos</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
