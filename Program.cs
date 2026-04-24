@@ -102,5 +102,25 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapRazorPages();
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+
+    string roleName = "Coordinador";
+
+    if (!await roleManager.RoleExistsAsync(roleName))
+    {
+        await roleManager.CreateAsync(new IdentityRole(roleName));
+    }
+
+    var email = "coordinador@uni.com";
+    var user = await userManager.FindByEmailAsync(email);
+
+    if (user != null && !await userManager.IsInRoleAsync(user, roleName))
+    {
+        await userManager.AddToRoleAsync(user, roleName);
+    }
+}
 
 app.Run();

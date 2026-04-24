@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using System;
 
 namespace PortalAcademico.Models
 {
@@ -13,6 +13,6 @@ namespace PortalAcademico.Models
 
         public DateTime FechaRegistro { get; set; }
 
-        public string Estado { get; set; } = string.Empty;
+        public string Estado { get; set; } = "Pendiente";
     }
 }

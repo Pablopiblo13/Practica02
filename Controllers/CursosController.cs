@@ -1,146 +1,106 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PortalAcademico.Data;
 using PortalAcademico.Models;
-using System.Linq;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Http;
-using PortalAcademico;
 
-namespace PortalAcademico.Controllers
+[Authorize(Roles = "Coordinador")]
+public class CoordinadorController : Controller
 {
-    public class CursosController : Controller
+    private readonly ApplicationDbContext _context;
+
+    public CoordinadorController(ApplicationDbContext context)
     {
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<IdentityUser> _userManager;
-
-        public CursosController(ApplicationDbContext context, UserManager<IdentityUser> userManager)
-        {
-            _context = context;
-            _userManager = userManager;
-        }
-
-        public IActionResult Index(string nombre, int? minCreditos, int? maxCreditos)
-{
-    string cacheKey = "cursos_list";
-
-    List<Curso>? cursos = HttpContext.Session.GetObject<List<Curso>>(cacheKey);
-
-    var cacheTime = HttpContext.Session.GetString("cursos_time");
-
-    bool cacheExpirado = cacheTime == null ||
-        (DateTime.Now - DateTime.Parse(cacheTime)).TotalSeconds > 60;
-
-    if (cursos == null || cacheExpirado)
-    {
-        cursos = _context.Cursos.Where(c => c.Activo).ToList();
-
-        HttpContext.Session.SetObject(cacheKey, cursos);
-        HttpContext.Session.SetString("cursos_time", DateTime.Now.ToString());
+        _context = context;
     }
 
-    var query = cursos.AsQueryable();
+    public async Task<IActionResult> Index()
+    {
+        var cursos = await _context.Cursos.ToListAsync();
+        return View(cursos);
+    }
 
-    if (!string.IsNullOrEmpty(nombre))
-        query = query.Where(c => c.Nombre.Contains(nombre));
+    public IActionResult Create()
+    {
+        return View();
+    }
 
-    if (minCreditos.HasValue)
-        query = query.Where(c => c.Creditos >= minCreditos.Value);
-
-    if (maxCreditos.HasValue)
-        query = query.Where(c => c.Creditos <= maxCreditos.Value);
-
-    return View(query.ToList());
-}
-
-        public IActionResult Detalle(int id)
+    [HttpPost]
+    public async Task<IActionResult> Create(Curso curso)
+    {
+        if (ModelState.IsValid)
         {
-            var curso = _context.Cursos.FirstOrDefault(c => c.Id == id);
-
-            if (curso == null)
-                return NotFound();
-
-            HttpContext.Session.SetString("UltimoCurso", curso.Nombre);
-
-            return View(curso);
+            _context.Add(curso);
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
         }
+        return View(curso);
+    }
 
-        [Authorize]
-        public async Task<IActionResult> Inscribirse(int id)
-        {
-            var user = await _userManager.GetUserAsync(User);
+    public async Task<IActionResult> Edit(int id)
+    {
+        var curso = await _context.Cursos.FindAsync(id);
 
-            if (user == null)
-                return Challenge();
+        if (curso == null)
+            return NotFound();
 
-            var curso = _context.Cursos.FirstOrDefault(c => c.Id == id && c.Activo);
+        return View(curso);
+    }
 
-            if (curso == null)
-                return NotFound();
+    [HttpPost]
+    public async Task<IActionResult> Edit(Curso curso)
+    {
+        _context.Update(curso);
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
 
-            var yaExiste = _context.Matriculas
-                .Any(m => m.CursoId == id && m.UsuarioId == user.Id);
+    public async Task<IActionResult> Toggle(int id)
+    {
+        var curso = await _context.Cursos.FindAsync(id);
 
-            if (yaExiste)
-            {
-                TempData["Mensaje"] = "Ya estás matriculado en este curso";
-                return RedirectToAction("Index");
-            }
+        if (curso == null)
+            return NotFound();
 
-            var inscritos = _context.Matriculas.Count(m => m.CursoId == id);
+        curso.Activo = !curso.Activo;
 
-            if (inscritos >= curso.CupoMaximo)
-            {
-                TempData["Mensaje"] = "No hay cupos disponibles";
-                return RedirectToAction("Index");
-            }
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
 
-            var choqueHorario = _context.Matriculas
-                .Where(m => m.UsuarioId == user.Id)
-                .Include(m => m.Curso)
-                .Any(m =>
-                    m.Curso.HorarioInicio < curso.HorarioFin &&
-                    curso.HorarioInicio < m.Curso.HorarioFin
-                );
+    public async Task<IActionResult> Matriculas(int id)
+    {
+        var data = await _context.Matriculas
+            .Include(m => m.Curso)
+            .Where(m => m.CursoId == id)
+            .ToListAsync();
 
-            if (choqueHorario)
-            {
-                TempData["Mensaje"] = "Conflicto de horario con otro curso";
-                return RedirectToAction("Index");
-            }
+        return View(data);
+    }
 
-            var matricula = new Matricula
-            {
-                CursoId = id,
-                UsuarioId = user.Id,
-                FechaRegistro = DateTime.Now,
-                Estado = "Pendiente"
-            };
+    public async Task<IActionResult> Confirmar(int id)
+    {
+        var m = await _context.Matriculas.FindAsync(id);
 
-            _context.Matriculas.Add(matricula);
-            _context.SaveChanges();
+        if (m == null)
+            return NotFound();
 
-            TempData["Mensaje"] = "Matrícula registrada en estado Pendiente";
+        m.Estado = "Confirmada";
 
-            return RedirectToAction("Index");
-        }
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
 
-        [Authorize]
-        public async Task<IActionResult> MisCursos()
-        {
-            var user = await _userManager.GetUserAsync(User);
+    public async Task<IActionResult> Cancelar(int id)
+    {
+        var m = await _context.Matriculas.FindAsync(id);
 
-            if (user == null)
-                return Challenge();
+        if (m == null)
+            return NotFound();
 
-            var cursos = _context.Matriculas
-                .Where(m => m.UsuarioId == user.Id)
-                .Include(m => m.Curso)
-                .Select(m => m.Curso)
-                .ToList();
+        m.Estado = "Cancelada";
 
-            return View(cursos);
-        }
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
     }
 }
