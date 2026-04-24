@@ -2,9 +2,20 @@
 
 <h2>Detalle del Curso</h2>
 
-<p><strong>Código:</strong> @Model.Codigo</p>
-<p><strong>Nombre:</strong> @Model.Nombre</p>
-<p><strong>Créditos:</strong> @Model.Creditos</p>
-<p><strong>Cupo:</strong> @Model.CupoMaximo</p>
+@if (Model == null)
+{
+    <div class="alert alert-danger">
+        Curso no encontrado
+    </div>
+}
+else
+{
+    <p><strong>Código:</strong> @Model.Codigo</p>
+    <p><strong>Nombre:</strong> @Model.Nombre</p>
+    <p><strong>Créditos:</strong> @Model.Creditos</p>
+    <p><strong>Cupo:</strong> @Model.CupoMaximo</p>
 
-<a href="/Cursos">Volver</a>
+    <a class="btn btn-secondary" href="/Cursos/Index">
+        Volver
+    </a>
+}
