@@ -102,6 +102,8 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapRazorPages();
+
+// ===== SEED DE ROLES (CORRECTO) =====
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -109,17 +111,17 @@ using (var scope = app.Services.CreateScope())
 
     string roleName = "Coordinador";
 
-    if (!await roleManager.RoleExistsAsync(roleName))
+    if (!roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult())
     {
-        await roleManager.CreateAsync(new IdentityRole(roleName));
+        roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
     }
 
     var email = "coordinador@uni.com";
-    var user = await userManager.FindByEmailAsync(email);
+    var user = userManager.FindByEmailAsync(email).GetAwaiter().GetResult();
 
-    if (user != null && !await userManager.IsInRoleAsync(user, roleName))
+    if (user != null && !userManager.IsInRoleAsync(user, roleName).GetAwaiter().GetResult())
     {
-        await userManager.AddToRoleAsync(user, roleName);
+        userManager.AddToRoleAsync(user, roleName).GetAwaiter().GetResult();
     }
 }
 
