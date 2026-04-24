@@ -5,6 +5,8 @@ using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using PortalAcademico;
 
 namespace PortalAcademico.Controllers
 {
@@ -19,28 +21,39 @@ namespace PortalAcademico.Controllers
             _userManager = userManager;
         }
 
-        // =========================
-        // LISTADO + FILTROS
-        // =========================
         public IActionResult Index(string nombre, int? minCreditos, int? maxCreditos)
-        {
-            var cursos = _context.Cursos.Where(c => c.Activo);
+{
+    string cacheKey = "cursos_list";
 
-            if (!string.IsNullOrEmpty(nombre))
-                cursos = cursos.Where(c => c.Nombre.Contains(nombre));
+    List<Curso>? cursos = HttpContext.Session.GetObject<List<Curso>>(cacheKey);
 
-            if (minCreditos.HasValue)
-                cursos = cursos.Where(c => c.Creditos >= minCreditos.Value);
+    var cacheTime = HttpContext.Session.GetString("cursos_time");
 
-            if (maxCreditos.HasValue)
-                cursos = cursos.Where(c => c.Creditos <= maxCreditos.Value);
+    bool cacheExpirado = cacheTime == null ||
+        (DateTime.Now - DateTime.Parse(cacheTime)).TotalSeconds > 60;
 
-            return View(cursos.ToList());
-        }
+    if (cursos == null || cacheExpirado)
+    {
+        cursos = _context.Cursos.Where(c => c.Activo).ToList();
 
-        // =========================
-        // DETALLE
-        // =========================
+        HttpContext.Session.SetObject(cacheKey, cursos);
+        HttpContext.Session.SetString("cursos_time", DateTime.Now.ToString());
+    }
+
+    var query = cursos.AsQueryable();
+
+    if (!string.IsNullOrEmpty(nombre))
+        query = query.Where(c => c.Nombre.Contains(nombre));
+
+    if (minCreditos.HasValue)
+        query = query.Where(c => c.Creditos >= minCreditos.Value);
+
+    if (maxCreditos.HasValue)
+        query = query.Where(c => c.Creditos <= maxCreditos.Value);
+
+    return View(query.ToList());
+}
+
         public IActionResult Detalle(int id)
         {
             var curso = _context.Cursos.FirstOrDefault(c => c.Id == id);
@@ -48,12 +61,11 @@ namespace PortalAcademico.Controllers
             if (curso == null)
                 return NotFound();
 
+            HttpContext.Session.SetString("UltimoCurso", curso.Nombre);
+
             return View(curso);
         }
 
-        // =========================
-        // INSCRIPCIÓN (PREGUNTA 3)
-        // =========================
         [Authorize]
         public async Task<IActionResult> Inscribirse(int id)
         {
@@ -67,7 +79,6 @@ namespace PortalAcademico.Controllers
             if (curso == null)
                 return NotFound();
 
-            // 1. ya inscrito
             var yaExiste = _context.Matriculas
                 .Any(m => m.CursoId == id && m.UsuarioId == user.Id);
 
@@ -77,7 +88,6 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction("Index");
             }
 
-            // 2. cupo máximo
             var inscritos = _context.Matriculas.Count(m => m.CursoId == id);
 
             if (inscritos >= curso.CupoMaximo)
@@ -86,7 +96,6 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction("Index");
             }
 
-            // 3. choque de horario
             var choqueHorario = _context.Matriculas
                 .Where(m => m.UsuarioId == user.Id)
                 .Include(m => m.Curso)
@@ -101,7 +110,6 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction("Index");
             }
 
-            // 4. crear matrícula en estado PENDIENTE
             var matricula = new Matricula
             {
                 CursoId = id,
@@ -118,9 +126,6 @@ namespace PortalAcademico.Controllers
             return RedirectToAction("Index");
         }
 
-        // =========================
-        // MIS CURSOS
-        // =========================
         [Authorize]
         public async Task<IActionResult> MisCursos()
         {

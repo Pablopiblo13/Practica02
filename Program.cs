@@ -1,4 +1,4 @@
-
+using System;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PortalAcademico.Data;
@@ -6,8 +6,7 @@ using PortalAcademico.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -15,25 +14,35 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>();
+builder.Services.AddDefaultIdentity<IdentityUser>(options =>
+{
+    options.SignIn.RequireConfirmedAccount = false;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddDistributedMemoryCache();
+
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 var app = builder.Build();
 
-// 🔥 SEED DE DATOS
 using (var scope = app.Services.CreateScope())
 {
-    var services = scope.ServiceProvider;
-
-    var context = services.GetRequiredService<ApplicationDbContext>();
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
     if (!context.Cursos.Any())
     {
         context.Cursos.AddRange(
-            new Curso {
+            new Curso
+            {
                 Codigo = "CS101",
                 Nombre = "Programación I",
                 Creditos = 3,
@@ -42,7 +51,8 @@ using (var scope = app.Services.CreateScope())
                 HorarioFin = DateTime.Now.AddHours(2),
                 Activo = true
             },
-            new Curso {
+            new Curso
+            {
                 Codigo = "CS102",
                 Nombre = "Base de Datos",
                 Creditos = 4,
@@ -51,7 +61,8 @@ using (var scope = app.Services.CreateScope())
                 HorarioFin = DateTime.Now.AddHours(5),
                 Activo = true
             },
-            new Curso {
+            new Curso
+            {
                 Codigo = "CS103",
                 Nombre = "Redes",
                 Creditos = 2,
@@ -66,7 +77,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -81,6 +91,8 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
