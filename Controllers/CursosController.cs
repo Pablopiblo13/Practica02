@@ -19,7 +19,9 @@ namespace PortalAcademico.Controllers
             _userManager = userManager;
         }
 
+        // =========================
         // LISTADO + FILTROS
+        // =========================
         public IActionResult Index(string nombre, int? minCreditos, int? maxCreditos)
         {
             var cursos = _context.Cursos.Where(c => c.Activo);
@@ -36,7 +38,9 @@ namespace PortalAcademico.Controllers
             return View(cursos.ToList());
         }
 
+        // =========================
         // DETALLE
+        // =========================
         public IActionResult Detalle(int id)
         {
             var curso = _context.Cursos.FirstOrDefault(c => c.Id == id);
@@ -47,27 +51,33 @@ namespace PortalAcademico.Controllers
             return View(curso);
         }
 
-        // INSCRIPCIÓN
+        // =========================
+        // INSCRIPCIÓN (PREGUNTA 3)
+        // =========================
         [Authorize]
         public async Task<IActionResult> Inscribirse(int id)
         {
             var user = await _userManager.GetUserAsync(User);
+
             if (user == null)
                 return Challenge();
 
             var curso = _context.Cursos.FirstOrDefault(c => c.Id == id && c.Activo);
+
             if (curso == null)
                 return NotFound();
 
+            // 1. ya inscrito
             var yaExiste = _context.Matriculas
                 .Any(m => m.CursoId == id && m.UsuarioId == user.Id);
 
             if (yaExiste)
             {
-                TempData["Mensaje"] = "Ya estás inscrito en este curso";
+                TempData["Mensaje"] = "Ya estás matriculado en este curso";
                 return RedirectToAction("Index");
             }
 
+            // 2. cupo máximo
             var inscritos = _context.Matriculas.Count(m => m.CursoId == id);
 
             if (inscritos >= curso.CupoMaximo)
@@ -76,27 +86,46 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction("Index");
             }
 
+            // 3. choque de horario
+            var choqueHorario = _context.Matriculas
+                .Where(m => m.UsuarioId == user.Id)
+                .Include(m => m.Curso)
+                .Any(m =>
+                    m.Curso.HorarioInicio < curso.HorarioFin &&
+                    curso.HorarioInicio < m.Curso.HorarioFin
+                );
+
+            if (choqueHorario)
+            {
+                TempData["Mensaje"] = "Conflicto de horario con otro curso";
+                return RedirectToAction("Index");
+            }
+
+            // 4. crear matrícula en estado PENDIENTE
             var matricula = new Matricula
             {
                 CursoId = id,
                 UsuarioId = user.Id,
                 FechaRegistro = DateTime.Now,
-                Estado = "Activa"
+                Estado = "Pendiente"
             };
 
             _context.Matriculas.Add(matricula);
-            await _context.SaveChangesAsync();
+            _context.SaveChanges();
 
-            TempData["Mensaje"] = "Inscripción realizada correctamente";
+            TempData["Mensaje"] = "Matrícula registrada en estado Pendiente";
 
             return RedirectToAction("Index");
         }
 
+        // =========================
         // MIS CURSOS
+        // =========================
         [Authorize]
         public async Task<IActionResult> MisCursos()
         {
             var user = await _userManager.GetUserAsync(User);
+
             if (user == null)
                 return Challenge();
 
