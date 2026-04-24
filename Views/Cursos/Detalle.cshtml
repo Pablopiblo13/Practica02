@@ -1,0 +1,21 @@
+@model PortalAcademico.Models.Curso
+
+<h2>Detalle del Curso</h2>
+
+@if (Model == null)
+{
+    <div class="alert alert-danger">
+        Curso no encontrado
+    </div>
+}
+else
+{
+    <p><strong>Código:</strong> @Model.Codigo</p>
+    <p><strong>Nombre:</strong> @Model.Nombre</p>
+    <p><strong>Créditos:</strong> @Model.Creditos</p>
+    <p><strong>Cupo:</strong> @Model.CupoMaximo</p>
+
+    <a class="btn btn-secondary" href="/Cursos/Index">
+        Volver
+    </a>
+}
